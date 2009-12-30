@@ -25,11 +25,11 @@ class TextBrowser(QtGui.QTextBrowser):
 
 class MainWindow(QtGui.QMainWindow):
 
-    def __init__(self):
+    def __init__(self, use_local = True):
 #       creates the window with the title and icon
         super(MainWindow, self).__init__()
         self.resize(480, 360)
-        self.setWindowTitle('MyDictionary')
+        self.setWindowTitle('IMDict')
         self.setWindowIcon(QtGui.QIcon('icons/icon.png'))
 
 
@@ -87,11 +87,26 @@ class MainWindow(QtGui.QMainWindow):
             self.__getattribute__(_).hide()
 
         self.lock = threading.Lock()
-        self.use_cache = True
 
-        self.directory = os.path.expanduser('~/.IMDict')
-        if not os.path.exists(self.directory):
-            os.mkdir(self.directory)
+        if use_local:
+            if os.name == 'nt':
+                self.directory = os.path.expanduser('~/AppData/Local/.IMDict/')
+            else:
+                self.directory = os.path.expanduser('~/.IMDict/')
+            if not os.path.exists(self.directory):
+                reply = QtGui.QMessageBox.question(self, 'No local configuration', 'Do you want me to create local configuration?', QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+                if reply == QtGui.QMessageBox.Yes:
+                    os.mkdir(self.directory)
+                    self.use_local = True
+                else:
+                    self.use_local = False
+            else:
+                db = shelve.open(self.directory+'/config.conf')
+                for _ in db.keys():
+                        self.__setattr__(_,db[_])
+                db.close()
+        else:
+            self.use_cache = False
 
         self.center()
         self.show()
@@ -136,8 +151,8 @@ class MainWindow(QtGui.QMainWindow):
 
     def search_word(self):
         if self.tabbar.currentIndex() == 0:
+            word = str(self.entry.text())
             if self.use_cache:
-                word = str(self.entry.text())
                 db = shelve.open(self.directory + langs[self.from_lang.currentIndex()] + '-' + langs[self.to_lang.currentIndex()]) 
                 if db.get(word):
                     definition = db[word]
@@ -162,6 +177,11 @@ class MainWindow(QtGui.QMainWindow):
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
-    window = MainWindow()
+    print(sys.argv)
+    if len(sys.argv) > 1 and sys.argv[1] == '--no-local':
+        use_local = False
+    else: 
+        use_local = True
+    window = MainWindow(use_local)
     sys.exit(app.exec_())       
 
